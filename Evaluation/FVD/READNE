@@ -1,0 +1,16 @@
+The folder should be like
+
+```
+main_folder/
+├── subfolder1/
+│   ├── navigated.mp4
+│   └── original.mp4
+├── subfolder2/
+│   ├── navigated.mp4
+│   └── original.mp4
+```
+
+run 
+```
+python calculate_scores --input_folder main folder
+```

@@ -1,0 +1,29 @@
+
+Folder structure should be like:
+```
+main_folder/
+├── subfolder1/
+│   └── original.png
+├── subfolder2/
+│   └── original.png
+```
+
+Run 
+```
+python consistency.py --unet_path unet_path --svd_path svd_path --navigation_distance d --rotation_times r --num_data n
+```
+
+After running generations, the folders look like
+```
+main_folder/
+├── subfolder1/
+│   ├── navigated.png
+│   └── original.png
+├── subfolder2/
+│   ├── navigated.png
+│   └── original.png
+```
+Run
+```
+python latent_mse.py main_folder
+```

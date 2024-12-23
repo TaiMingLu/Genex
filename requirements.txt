@@ -1,0 +1,15 @@
+numpy
+torch
+torchvision
+opencv-python
+Pillow
+tqdm
+matplotlib
+einops
+lpips
+accelerate
+transformers
+huggingface-hub
+packaging
+diffusers
+timm

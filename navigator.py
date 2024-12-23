@@ -2,9 +2,10 @@ from PIL import Image
 import numpy as np
 from math import pi, atan2, hypot
 import torch
-# from diffusers import UNetSpatioTemporalConditionModel, StableVideoDiffusionPipeline
-# from diffusers.utils import load_image, export_to_video, export_to_gif
+from diffusers import UNetSpatioTemporalConditionModel, StableVideoDiffusionPipeline
+from diffusers.utils import load_image, export_to_video, export_to_gif
 import imageio
+import cv2
 from tqdm import tqdm
 
 class Navigator:
@@ -26,36 +27,36 @@ class Navigator:
         return flattened_frames
 
 
-    # def get_pipeline(self, unet_path, svd_path, num_frames=25, fps=7, progress_bar=True, image_width=1024, image_height=512, model_width=1024, model_height=None):
-    #     unet = UNetSpatioTemporalConditionModel.from_pretrained(
-    #         unet_path,
-    #         subfolder="unet",
-    #         torch_dtype=torch.float16,
-    #         low_cpu_mem_usage=True, 
-    #     )
-    #     print('Unet Loaded')
-    #     pipe = StableVideoDiffusionPipeline.from_pretrained(
-    #         svd_path,
-    #         unet=unet,
-    #         low_cpu_mem_usage=True,
-    #         torch_dtype=torch.float16, variant="fp16", local_files_only=True, 
-    #     )
-    #     pipe.set_progress_bar_config(disable=not progress_bar)
-    #     pipe.to("cuda:0")
-    #     print('Pipeline Loaded')
-    #     self.pipe = pipe
+    def get_pipeline(self, unet_path, svd_path, num_frames=25, fps=7, progress_bar=True, image_width=1024, image_height=512, model_width=1024, model_height=None):
+        unet = UNetSpatioTemporalConditionModel.from_pretrained(
+            unet_path,
+            subfolder="unet",
+            torch_dtype=torch.float16,
+            low_cpu_mem_usage=True, 
+        )
+        print('Unet Loaded')
+        pipe = StableVideoDiffusionPipeline.from_pretrained(
+            svd_path,
+            unet=unet,
+            low_cpu_mem_usage=True,
+            torch_dtype=torch.float16, variant="fp16", local_files_only=True, 
+        )
+        pipe.set_progress_bar_config(disable=not progress_bar)
+        pipe.to("cuda:0")
+        print('Pipeline Loaded')
+        self.pipe = pipe
 
-    #     self.image_width = image_width
-    #     self.image_height = image_height
-    #     self.model_width = model_width
-    #     self.model_height = model_height
-    #     self.num_frames = num_frames
-    #     self.fps = fps
+        self.image_width = image_width
+        self.image_height = image_height
+        self.model_width = model_width
+        self.model_height = model_height
+        self.num_frames = num_frames
+        self.fps = fps
 
 
-        # return pipe
+        return pipe
 
-    def move_forward(self, image=None, num_frames=10, num_steps=None, width=None, height=None, num_inference_steps=30, noise_aug_strength=0.02):
+    def move_forward(self, image=None, num_frames=25, num_steps=None, width=None, height=None, num_inference_steps=30, noise_aug_strength=0.02):
 
         if not image:
             image = self.generations[-1][-1]
@@ -122,7 +123,7 @@ class Navigator:
 
         print(f'GIF saved as {save_path}')
 
-    def navigate_path(self, path, start_image, width=1024, height=512, fps=10, num_inference_steps=50):
+    def navigate_path(self, path, start_image, num_inference_steps=50):
         """
         Example Trajectory: 
         {'turn_angle': 62.44414980499492, 'move_distance': 5, 'new_position': (2.31, 4.43), 'new_angle': 62.44414980499492}
@@ -151,7 +152,7 @@ class Navigator:
                 current_image = self.rotate_panorama(current_image, turn_angle)
 
             if move_distance != 0:
-                movement = self.move_forward(current_image, num_steps=move_distance, width=width, height=height, fps=fps, num_inference_steps=num_inference_steps)
+                movement = self.move_forward(current_image, num_steps=move_distance, num_inference_steps=num_inference_steps)
                 generations.append(movement)
                 current_image = movement[-1]
             else:
@@ -178,7 +179,6 @@ class Navigator:
 
         # Scale up the image for processing
         original_size = panorama_image.size
-        print(original_size)
         scaled_size = (original_size[0] * scale_factor, original_size[1] * scale_factor)
         panorama_image = panorama_image.resize(scaled_size, Image.LANCZOS)
 
@@ -222,7 +222,7 @@ class Navigator:
 
         return rotated_image
     
-    def convert_panorama_to_cubemap(self, panorama_image, interpolation=True, scale_factor=2):
+    def convert_panorama_to_cubemap(self, panorama_image=None, interpolation=True, scale_factor=2):
         """
         Convert an equirectangular panorama image to a cube map with optional scaling.
 
@@ -234,6 +234,10 @@ class Navigator:
         Returns:
         tuple: A tuple containing the cube map image and a dictionary of individual cube faces.
         """
+
+        if not panorama_image:
+            panorama_image = self.get_current_image()
+
         # Scale up the input panorama
         original_size = panorama_image.size
         scaled_size = (original_size[0] * scale_factor, original_size[1] * scale_factor)
@@ -548,3 +552,83 @@ class Navigator:
         print('Converted Cube Map to Equirectangular Panorama.')
 
         return equirectangular_image
+    
+def extract_normal_view(self, panorama, fov_h, fov_v, center_yaw, center_pitch, center_roll, output_width, output_height):
+    """
+    Extract a rectilinear view from an equirectangular panorama with proper rotation order.
+    """
+    if isinstance(panorama, Image.Image):
+        panorama = np.array(panorama)
+
+    pano_height, pano_width = panorama.shape[:2]
+
+    # Convert angles to radians
+    yaw, pitch, roll = np.deg2rad([center_yaw, center_pitch, center_roll])
+    fov_h_rad = np.deg2rad(fov_h)
+    fov_v_rad = np.deg2rad(fov_v)
+
+    # Create rotation matrices with correct order: roll -> pitch -> yaw
+    # Roll (around viewing direction / z-axis)
+    Rroll = np.array([
+        [np.cos(roll), -np.sin(roll), 0],
+        [np.sin(roll), np.cos(roll), 0],
+        [0, 0, 1]
+    ])
+    
+    # Pitch (around x-axis)
+    Rpitch = np.array([
+        [1, 0, 0],
+        [0, np.cos(pitch), -np.sin(pitch)],
+        [0, np.sin(pitch), np.cos(pitch)]
+    ])
+    
+    # Yaw (around y-axis)
+    Ryaw = np.array([
+        [np.cos(yaw), 0, np.sin(yaw)],
+        [0, 1, 0],
+        [-np.sin(yaw), 0, np.cos(yaw)]
+    ])
+    
+    # Combined rotation matrix: apply roll first, then pitch, then yaw
+    R = Ryaw @ Rpitch @ Rroll
+
+    # Create viewing grid
+    x = np.linspace(-np.tan(fov_h_rad / 2), np.tan(fov_h_rad / 2), output_width)
+    y = np.linspace(np.tan(fov_v_rad / 2), -np.tan(fov_v_rad / 2), output_height)
+    x_grid, y_grid = np.meshgrid(x, y)
+
+    # Create normalized direction vectors
+    z = np.ones_like(x_grid)
+    vectors = np.stack([x_grid, y_grid, z], axis=-1)
+    norms = np.sqrt(np.sum(vectors**2, axis=2, keepdims=True))
+    vectors = vectors / norms
+
+    # Reshape for matrix multiplication
+    vectors = vectors.reshape(-1, 3)
+    
+    # Apply rotation
+    rotated_vectors = vectors @ R.T
+    
+    # Convert to spherical coordinates
+    x_rot, y_rot, z_rot = rotated_vectors[:, 0], rotated_vectors[:, 1], rotated_vectors[:, 2]
+    
+    # Calculate spherical coordinates
+    lon = np.arctan2(x_rot, z_rot)
+    lat = np.arcsin(np.clip(y_rot, -1, 1))
+
+    # Convert to panorama pixel coordinates
+    px = ((lon + np.pi) / (2 * np.pi)) * pano_width
+    py = ((np.pi/2 - lat) / np.pi) * pano_height
+
+    # Reshape for remap
+    px = px.reshape(output_height, output_width).astype(np.float32)
+    py = py.reshape(output_height, output_width).astype(np.float32)
+
+    # Ensure pixel indices are within bounds
+    px = np.clip(px, 0, pano_width - 1)
+    py = np.clip(py, 0, pano_height - 1)
+
+    # Use OpenCV remap to sample pixels
+    output_image = cv2.remap(panorama, px, py, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_WRAP)
+
+    return Image.fromarray(output_image)

@@ -1,0 +1,24 @@
+accelerate launch --config_file=<path_to_accelerate_config> \
+    <path_to_training_script> \
+    --base_folder=<path_to_dataset_folder> \
+    --pretrained_model_name_or_path=<path_to_pretrained_model> \
+    --num_frames=<number_of_frames> \
+    --width=<image_width> \
+    --height=<image_height> \
+    --output_dir=<path_to_output_directory> \
+    --logging_dir=<path_to_logging_directory> \
+    --per_gpu_batch_size=<batch_size_per_gpu> \
+    --gradient_accumulation_steps=<number_of_accumulated_steps> \
+    --gradient_checkpointing \
+    --max_train_steps=<total_training_steps> \
+    --checkpointing_steps=<checkpoint_save_interval> \
+    --checkpoints_total_limit=<maximum_number_of_checkpoints> \
+    --learning_rate=<learning_rate> \
+    --lr_warmup_steps=<warmup_steps> \
+    --lr_scheduler=<learning_rate_scheduler> \
+    --seed=<random_seed> \
+    --mixed_precision=<precision_mode> \
+    --validation_steps=<validation_interval> \
+    --num_validation_images=<number_of_validation_images> \
+    --report_to=<logging_tool> \
+    --validation_images_folder=<path_to_validation_images_folder>
